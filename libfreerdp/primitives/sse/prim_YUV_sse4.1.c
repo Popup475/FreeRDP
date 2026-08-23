@@ -37,7 +37,7 @@
 #include <tmmintrin.h>
 #include <smmintrin.h>
 
-static primitives_t* generic = NULL;
+static primitives_t* generic = nullptr;
 
 /****************************************************************************/
 /* sse41 YUV420 -> RGB conversion                                           */
@@ -635,7 +635,7 @@ static inline void sse41_RGBToYUV420_BGRX_Y(const BYTE* WINPR_RESTRICT src, BYTE
 
 	for (; x < width; x++)
 	{
-		sse41_BGRX_TO_YUV(&src[4ULL * x], &dst[x], NULL, NULL);
+		sse41_BGRX_TO_YUV(&src[4ULL * x], &dst[x], nullptr, nullptr);
 	}
 }
 
@@ -711,12 +711,12 @@ static inline void sse41_RGBToYUV420_BGRX_UV(const BYTE* WINPR_RESTRICT src1,
 
 	for (; x < width - width % 2; x += 2)
 	{
-		BYTE u[4] = { 0 };
-		BYTE v[4] = { 0 };
-		sse41_BGRX_TO_YUV(&src1[4ULL * x], NULL, &u[0], &v[0]);
-		sse41_BGRX_TO_YUV(&src1[4ULL * (1ULL + x)], NULL, &u[1], &v[1]);
-		sse41_BGRX_TO_YUV(&src2[4ULL * x], NULL, &u[2], &v[2]);
-		sse41_BGRX_TO_YUV(&src2[4ULL * (1ULL + x)], NULL, &u[3], &v[3]);
+		BYTE u[4] = WINPR_C_ARRAY_INIT;
+		BYTE v[4] = WINPR_C_ARRAY_INIT;
+		sse41_BGRX_TO_YUV(&src1[4ULL * x], nullptr, &u[0], &v[0]);
+		sse41_BGRX_TO_YUV(&src1[4ULL * (1ULL + x)], nullptr, &u[1], &v[1]);
+		sse41_BGRX_TO_YUV(&src2[4ULL * x], nullptr, &u[2], &v[2]);
+		sse41_BGRX_TO_YUV(&src2[4ULL * (1ULL + x)], nullptr, &u[3], &v[3]);
 		const INT16 u4 = WINPR_ASSERTING_INT_CAST(INT16, (INT16)u[0] + u[1] + u[2] + u[3]);
 		const INT16 uu = WINPR_ASSERTING_INT_CAST(INT16, u4 / 4);
 		const BYTE u8 = CLIP(uu);
@@ -841,7 +841,7 @@ static inline void sse41_RGBToAVC444YUV_BGRX_DOUBLE_ROW(
 			 * We need to split these according to
 			 * 3.3.8.3.2 YUV420p Stream Combination for YUV444 mode */
 			__m128i ue;
-			__m128i uo = { 0 };
+			__m128i uo = WINPR_C_ARRAY_INIT;
 			{
 				const __m128i ue1 =
 				    _mm_srai_epi16(_mm_hadd_epi16(_mm_maddubs_epi16(xe1, u_factors),
@@ -919,7 +919,7 @@ static inline void sse41_RGBToAVC444YUV_BGRX_DOUBLE_ROW(
 			 * We need to split these according to
 			 * 3.3.8.3.2 YUV420p Stream Combination for YUV444 mode */
 			__m128i ve;
-			__m128i vo = { 0 };
+			__m128i vo = WINPR_C_ARRAY_INIT;
 			{
 				const __m128i ve1 =
 				    _mm_srai_epi16(_mm_hadd_epi16(_mm_maddubs_epi16(xe1, v_factors),
@@ -1031,8 +1031,8 @@ static pstatus_t sse41_RGBToAVC444YUV_BGRX(const BYTE* WINPR_RESTRICT pSrc,
 		BYTE* b3 = pDst1[2] + (y / 2) * dst1Step[2];
 		BYTE* b6 = pDst2[1] + (y / 2) * dst2Step[1];
 		BYTE* b7 = pDst2[2] + (y / 2) * dst2Step[2];
-		general_RGBToAVC444YUV_BGRX_DOUBLE_ROW(0, srcEven, NULL, b1Even, NULL, b2, b3, NULL, NULL,
-		                                       b6, b7, roi->width);
+		general_RGBToAVC444YUV_BGRX_DOUBLE_ROW(0, srcEven, nullptr, b1Even, nullptr, b2, b3,
+		                                       nullptr, nullptr, b6, b7, roi->width);
 	}
 
 	return PRIMITIVES_SUCCESS;
@@ -1365,10 +1365,10 @@ static pstatus_t sse41_RGBToAVC444YUVv2_BGRX(const BYTE* WINPR_RESTRICT pSrc,
 		BYTE* dstChromaV1 = (pDst2[2] + (y / 2) * dst2Step[2]);
 		BYTE* dstChromaU2 = dstChromaU1 + roi->width / 4;
 		BYTE* dstChromaV2 = dstChromaV1 + roi->width / 4;
-		general_RGBToAVC444YUVv2_BGRX_DOUBLE_ROW(0, srcEven, NULL, dstLumaYEven, NULL, dstLumaU,
-		                                         dstLumaV, dstEvenChromaY1, dstEvenChromaY2, NULL,
-		                                         NULL, dstChromaU1, dstChromaU2, dstChromaV1,
-		                                         dstChromaV2, roi->width);
+		general_RGBToAVC444YUVv2_BGRX_DOUBLE_ROW(0, srcEven, nullptr, dstLumaYEven, nullptr,
+		                                         dstLumaU, dstLumaV, dstEvenChromaY1,
+		                                         dstEvenChromaY2, nullptr, nullptr, dstChromaU1,
+		                                         dstChromaU2, dstChromaV1, dstChromaV2, roi->width);
 	}
 
 	return PRIMITIVES_SUCCESS;
@@ -1497,7 +1497,7 @@ static pstatus_t sse41_ChromaV1ToYUV444(const BYTE* WINPR_RESTRICT pSrcRaw[3],
 	const UINT32 oddX = 1;
 	/* The auxiliary frame is aligned to multiples of 16x16.
 	 * We need the padded height for B4 and B5 conversion. */
-	const UINT32 padHeigth = nHeight + 16 - nHeight % 16;
+	const UINT32 padHeight = nHeight + 16 - nHeight % 16;
 	const BYTE* pSrc[3] = { pSrcRaw[0] + 1ULL * roi->top * srcStep[0] + roi->left,
 		                    pSrcRaw[1] + 1ULL * roi->top / 2 * srcStep[1] + roi->left / 2,
 		                    pSrcRaw[2] + 1ULL * roi->top / 2 * srcStep[2] + roi->left / 2 };
@@ -1510,10 +1510,10 @@ static pstatus_t sse41_ChromaV1ToYUV444(const BYTE* WINPR_RESTRICT pSrcRaw[3],
 
 	/* The second half of U and V is a bit more tricky... */
 	/* B4 and B5 */
-	for (size_t y = 0; y < padHeigth; y++)
+	for (size_t y = 0; y < padHeight; y++)
 	{
 		const BYTE* Ya = pSrc[0] + 1ULL * srcStep[0] * y;
-		BYTE* pX = NULL;
+		BYTE* pX = nullptr;
 
 		if ((y) % mod < (mod + 1) / 2)
 		{
@@ -1534,7 +1534,8 @@ static pstatus_t sse41_ChromaV1ToYUV444(const BYTE* WINPR_RESTRICT pSrcRaw[3],
 			pX = pDst[2] + 1ULL * dstStep[2] * pos;
 		}
 
-		memcpy(pX, Ya, nWidth);
+		if (y < nHeight)
+			memcpy(pX, Ya, nWidth);
 	}
 
 	/* B6 and B7 */

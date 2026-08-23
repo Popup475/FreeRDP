@@ -380,7 +380,8 @@ BOOL sdlInput::keyboard_set_ime_status(rdpContext* context, UINT16 imeId, UINT32
 		{ "SDL_KMOD_CAPS", SDL_KMOD_CAPS },     { "SDL_KMOD_MODE", SDL_KMOD_MODE },
 		{ "SDL_KMOD_SCROLL", SDL_KMOD_SCROLL }, { "SDL_KMOD_CTRL", SDL_KMOD_CTRL },
 		{ "SDL_KMOD_SHIFT", SDL_KMOD_SHIFT },   { "SDL_KMOD_ALT", SDL_KMOD_ALT },
-		{ "SDL_KMOD_GUI", SDL_KMOD_GUI },       { "SDL_KMOD_NONE", SDL_KMOD_NONE }
+		{ "SDL_KMOD_GUI", SDL_KMOD_GUI },       { "SDL_KMOD_NONE", SDL_KMOD_NONE },
+		{ "SDL_KMOD_MODE", SDL_KMOD_MODE },     { "SDL_KMOD_LEVEL5", SDL_KMOD_LEVEL5 }
 	};
 
 	return s_map;
@@ -406,7 +407,7 @@ BOOL sdlInput::keyboard_set_ime_status(rdpContext* context, UINT16 imeId, UINT32
 	std::string str = "<";
 	for (uint32_t x = 0; x < 32; x++)
 	{
-		uint32_t cmask = 1 << x;
+		uint32_t cmask = 1u << x;
 		if ((mask & cmask) != 0)
 		{
 			auto s = modbyvalue(cmask);

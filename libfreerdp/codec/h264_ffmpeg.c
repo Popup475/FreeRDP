@@ -25,8 +25,19 @@
 #include <freerdp/codec/h264.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/opt.h>
+#include <libswscale/swscale.h>
 
 #include "h264.h"
+
+#ifdef WITH_VIDEOTOOLBOX
+#if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(55, 9, 0)
+#include <libavutil/hwcontext.h>
+#else
+#pragma warning You have asked for VideoToolbox decoding, \
+    but your version of libavutil is too old !Disabling.
+#undef WITH_VIDEOTOOLBOX
+#endif
+#endif
 
 #ifdef WITH_VAAPI
 #if LIBAVUTIL_VERSION_INT >= AV_VERSION_INT(55, 9, 0)
@@ -53,6 +64,251 @@
 #define AV_PIX_FMT_YUV420P PIX_FMT_YUV420P
 #endif
 
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
+static const char* av_format_str(int32_t format)
+{
+#define EVCASE(x) \
+	case x:       \
+		return #x
+
+	switch (format)
+	{
+		EVCASE(AV_PIX_FMT_NONE);
+		EVCASE(AV_PIX_FMT_YUV420P);
+		EVCASE(AV_PIX_FMT_YUYV422);
+		EVCASE(AV_PIX_FMT_RGB24);
+		EVCASE(AV_PIX_FMT_BGR24);
+		EVCASE(AV_PIX_FMT_YUV422P);
+		EVCASE(AV_PIX_FMT_YUV444P);
+		EVCASE(AV_PIX_FMT_YUV410P);
+		EVCASE(AV_PIX_FMT_YUV411P);
+		EVCASE(AV_PIX_FMT_GRAY8);
+		EVCASE(AV_PIX_FMT_MONOWHITE);
+		EVCASE(AV_PIX_FMT_MONOBLACK);
+		EVCASE(AV_PIX_FMT_PAL8);
+		EVCASE(AV_PIX_FMT_YUVJ420P);
+		EVCASE(AV_PIX_FMT_YUVJ422P);
+		EVCASE(AV_PIX_FMT_YUVJ444P);
+		EVCASE(AV_PIX_FMT_UYVY422);
+		EVCASE(AV_PIX_FMT_UYYVYY411);
+		EVCASE(AV_PIX_FMT_BGR8);
+		EVCASE(AV_PIX_FMT_BGR4);
+		EVCASE(AV_PIX_FMT_BGR4_BYTE);
+		EVCASE(AV_PIX_FMT_RGB8);
+		EVCASE(AV_PIX_FMT_RGB4);
+		EVCASE(AV_PIX_FMT_RGB4_BYTE);
+		EVCASE(AV_PIX_FMT_NV12);
+		EVCASE(AV_PIX_FMT_NV21);
+		EVCASE(AV_PIX_FMT_ARGB);
+		EVCASE(AV_PIX_FMT_RGBA);
+		EVCASE(AV_PIX_FMT_ABGR);
+		EVCASE(AV_PIX_FMT_BGRA);
+		EVCASE(AV_PIX_FMT_GRAY16BE);
+		EVCASE(AV_PIX_FMT_GRAY16LE);
+		EVCASE(AV_PIX_FMT_YUV440P);
+		EVCASE(AV_PIX_FMT_YUVJ440P);
+		EVCASE(AV_PIX_FMT_YUVA420P);
+		EVCASE(AV_PIX_FMT_RGB48BE);
+		EVCASE(AV_PIX_FMT_RGB48LE);
+		EVCASE(AV_PIX_FMT_RGB565BE);
+		EVCASE(AV_PIX_FMT_RGB565LE);
+		EVCASE(AV_PIX_FMT_RGB555BE);
+		EVCASE(AV_PIX_FMT_RGB555LE);
+		EVCASE(AV_PIX_FMT_BGR565BE);
+		EVCASE(AV_PIX_FMT_BGR565LE);
+		EVCASE(AV_PIX_FMT_BGR555BE);
+		EVCASE(AV_PIX_FMT_BGR555LE);
+		EVCASE(AV_PIX_FMT_VAAPI);
+		EVCASE(AV_PIX_FMT_YUV420P16LE);
+		EVCASE(AV_PIX_FMT_YUV420P16BE);
+		EVCASE(AV_PIX_FMT_YUV422P16LE);
+		EVCASE(AV_PIX_FMT_YUV422P16BE);
+		EVCASE(AV_PIX_FMT_YUV444P16LE);
+		EVCASE(AV_PIX_FMT_YUV444P16BE);
+		EVCASE(AV_PIX_FMT_DXVA2_VLD);
+		EVCASE(AV_PIX_FMT_RGB444LE);
+		EVCASE(AV_PIX_FMT_RGB444BE);
+		EVCASE(AV_PIX_FMT_BGR444LE);
+		EVCASE(AV_PIX_FMT_BGR444BE);
+		EVCASE(AV_PIX_FMT_GRAY8A);
+		EVCASE(AV_PIX_FMT_BGR48BE);
+		EVCASE(AV_PIX_FMT_BGR48LE);
+		EVCASE(AV_PIX_FMT_YUV420P9BE);
+		EVCASE(AV_PIX_FMT_YUV420P9LE);
+		EVCASE(AV_PIX_FMT_YUV420P10BE);
+		EVCASE(AV_PIX_FMT_YUV420P10LE);
+		EVCASE(AV_PIX_FMT_YUV422P10BE);
+		EVCASE(AV_PIX_FMT_YUV422P10LE);
+		EVCASE(AV_PIX_FMT_YUV444P9BE);
+		EVCASE(AV_PIX_FMT_YUV444P9LE);
+		EVCASE(AV_PIX_FMT_YUV444P10BE);
+		EVCASE(AV_PIX_FMT_YUV444P10LE);
+		EVCASE(AV_PIX_FMT_YUV422P9BE);
+		EVCASE(AV_PIX_FMT_YUV422P9LE);
+		EVCASE(AV_PIX_FMT_GBR24P);
+		EVCASE(AV_PIX_FMT_GBRP9BE);
+		EVCASE(AV_PIX_FMT_GBRP9LE);
+		EVCASE(AV_PIX_FMT_GBRP10BE);
+		EVCASE(AV_PIX_FMT_GBRP10LE);
+		EVCASE(AV_PIX_FMT_GBRP16BE);
+		EVCASE(AV_PIX_FMT_GBRP16LE);
+		EVCASE(AV_PIX_FMT_YUVA422P);
+		EVCASE(AV_PIX_FMT_YUVA444P);
+		EVCASE(AV_PIX_FMT_YUVA420P9BE);
+		EVCASE(AV_PIX_FMT_YUVA420P9LE);
+		EVCASE(AV_PIX_FMT_YUVA422P9BE);
+		EVCASE(AV_PIX_FMT_YUVA422P9LE);
+		EVCASE(AV_PIX_FMT_YUVA444P9BE);
+		EVCASE(AV_PIX_FMT_YUVA444P9LE);
+		EVCASE(AV_PIX_FMT_YUVA420P10BE);
+		EVCASE(AV_PIX_FMT_YUVA420P10LE);
+		EVCASE(AV_PIX_FMT_YUVA422P10BE);
+		EVCASE(AV_PIX_FMT_YUVA422P10LE);
+		EVCASE(AV_PIX_FMT_YUVA444P10BE);
+		EVCASE(AV_PIX_FMT_YUVA444P10LE);
+		EVCASE(AV_PIX_FMT_YUVA420P16BE);
+		EVCASE(AV_PIX_FMT_YUVA420P16LE);
+		EVCASE(AV_PIX_FMT_YUVA422P16BE);
+		EVCASE(AV_PIX_FMT_YUVA422P16LE);
+		EVCASE(AV_PIX_FMT_YUVA444P16BE);
+		EVCASE(AV_PIX_FMT_YUVA444P16LE);
+		EVCASE(AV_PIX_FMT_VDPAU);
+		EVCASE(AV_PIX_FMT_XYZ12LE);
+		EVCASE(AV_PIX_FMT_XYZ12BE);
+		EVCASE(AV_PIX_FMT_NV16);
+		EVCASE(AV_PIX_FMT_NV20LE);
+		EVCASE(AV_PIX_FMT_NV20BE);
+		EVCASE(AV_PIX_FMT_RGBA64BE);
+		EVCASE(AV_PIX_FMT_RGBA64LE);
+		EVCASE(AV_PIX_FMT_BGRA64BE);
+		EVCASE(AV_PIX_FMT_BGRA64LE);
+		EVCASE(AV_PIX_FMT_YVYU422);
+		EVCASE(AV_PIX_FMT_YA16BE);
+		EVCASE(AV_PIX_FMT_YA16LE);
+		EVCASE(AV_PIX_FMT_GBRAP);
+		EVCASE(AV_PIX_FMT_GBRAP16BE);
+		EVCASE(AV_PIX_FMT_GBRAP16LE);
+		EVCASE(AV_PIX_FMT_QSV);
+		EVCASE(AV_PIX_FMT_MMAL);
+		EVCASE(AV_PIX_FMT_D3D11VA_VLD);
+		EVCASE(AV_PIX_FMT_CUDA);
+		EVCASE(AV_PIX_FMT_0RGB);
+		EVCASE(AV_PIX_FMT_RGB0);
+		EVCASE(AV_PIX_FMT_0BGR);
+		EVCASE(AV_PIX_FMT_BGR0);
+		EVCASE(AV_PIX_FMT_YUV420P12BE);
+		EVCASE(AV_PIX_FMT_YUV420P12LE);
+		EVCASE(AV_PIX_FMT_YUV420P14BE);
+		EVCASE(AV_PIX_FMT_YUV420P14LE);
+		EVCASE(AV_PIX_FMT_YUV422P12BE);
+		EVCASE(AV_PIX_FMT_YUV422P12LE);
+		EVCASE(AV_PIX_FMT_YUV422P14BE);
+		EVCASE(AV_PIX_FMT_YUV422P14LE);
+		EVCASE(AV_PIX_FMT_YUV444P12BE);
+		EVCASE(AV_PIX_FMT_YUV444P12LE);
+		EVCASE(AV_PIX_FMT_YUV444P14BE);
+		EVCASE(AV_PIX_FMT_YUV444P14LE);
+		EVCASE(AV_PIX_FMT_GBRP12BE);
+		EVCASE(AV_PIX_FMT_GBRP12LE);
+		EVCASE(AV_PIX_FMT_GBRP14BE);
+		EVCASE(AV_PIX_FMT_GBRP14LE);
+		EVCASE(AV_PIX_FMT_YUVJ411P);
+		EVCASE(AV_PIX_FMT_BAYER_BGGR8);
+		EVCASE(AV_PIX_FMT_BAYER_RGGB8);
+		EVCASE(AV_PIX_FMT_BAYER_GBRG8);
+		EVCASE(AV_PIX_FMT_BAYER_GRBG8);
+		EVCASE(AV_PIX_FMT_BAYER_BGGR16LE);
+		EVCASE(AV_PIX_FMT_BAYER_BGGR16BE);
+		EVCASE(AV_PIX_FMT_BAYER_RGGB16LE);
+		EVCASE(AV_PIX_FMT_BAYER_RGGB16BE);
+		EVCASE(AV_PIX_FMT_BAYER_GBRG16LE);
+		EVCASE(AV_PIX_FMT_BAYER_GBRG16BE);
+		EVCASE(AV_PIX_FMT_BAYER_GRBG16LE);
+		EVCASE(AV_PIX_FMT_BAYER_GRBG16BE);
+		EVCASE(AV_PIX_FMT_YUV440P10LE);
+		EVCASE(AV_PIX_FMT_YUV440P10BE);
+		EVCASE(AV_PIX_FMT_YUV440P12LE);
+		EVCASE(AV_PIX_FMT_YUV440P12BE);
+		EVCASE(AV_PIX_FMT_AYUV64LE);
+		EVCASE(AV_PIX_FMT_AYUV64BE);
+		EVCASE(AV_PIX_FMT_VIDEOTOOLBOX);
+		EVCASE(AV_PIX_FMT_P010LE);
+		EVCASE(AV_PIX_FMT_P010BE);
+		EVCASE(AV_PIX_FMT_GBRAP12BE);
+		EVCASE(AV_PIX_FMT_GBRAP12LE);
+		EVCASE(AV_PIX_FMT_GBRAP10BE);
+		EVCASE(AV_PIX_FMT_GBRAP10LE);
+		EVCASE(AV_PIX_FMT_MEDIACODEC);
+		EVCASE(AV_PIX_FMT_GRAY12BE);
+		EVCASE(AV_PIX_FMT_GRAY12LE);
+		EVCASE(AV_PIX_FMT_GRAY10BE);
+		EVCASE(AV_PIX_FMT_GRAY10LE);
+		EVCASE(AV_PIX_FMT_P016LE);
+		EVCASE(AV_PIX_FMT_P016BE);
+		EVCASE(AV_PIX_FMT_D3D11);
+		EVCASE(AV_PIX_FMT_GRAY9BE);
+		EVCASE(AV_PIX_FMT_GRAY9LE);
+		EVCASE(AV_PIX_FMT_GBRPF32BE);
+		EVCASE(AV_PIX_FMT_GBRPF32LE);
+		EVCASE(AV_PIX_FMT_GBRAPF32BE);
+		EVCASE(AV_PIX_FMT_GBRAPF32LE);
+		EVCASE(AV_PIX_FMT_DRM_PRIME);
+		EVCASE(AV_PIX_FMT_OPENCL);
+		EVCASE(AV_PIX_FMT_GRAY14BE);
+		EVCASE(AV_PIX_FMT_GRAY14LE);
+		EVCASE(AV_PIX_FMT_GRAYF32BE);
+		EVCASE(AV_PIX_FMT_GRAYF32LE);
+		EVCASE(AV_PIX_FMT_YUVA422P12BE);
+		EVCASE(AV_PIX_FMT_YUVA422P12LE);
+		EVCASE(AV_PIX_FMT_YUVA444P12BE);
+		EVCASE(AV_PIX_FMT_YUVA444P12LE);
+		EVCASE(AV_PIX_FMT_NV24);
+		EVCASE(AV_PIX_FMT_NV42);
+		EVCASE(AV_PIX_FMT_VULKAN);
+		EVCASE(AV_PIX_FMT_Y210BE);
+		EVCASE(AV_PIX_FMT_Y210LE);
+		EVCASE(AV_PIX_FMT_X2RGB10LE);
+		EVCASE(AV_PIX_FMT_X2RGB10BE);
+		EVCASE(AV_PIX_FMT_X2BGR10LE);
+		EVCASE(AV_PIX_FMT_X2BGR10BE);
+		EVCASE(AV_PIX_FMT_P210BE);
+		EVCASE(AV_PIX_FMT_P210LE);
+		EVCASE(AV_PIX_FMT_P410BE);
+		EVCASE(AV_PIX_FMT_P410LE);
+		EVCASE(AV_PIX_FMT_P216BE);
+		EVCASE(AV_PIX_FMT_P216LE);
+		EVCASE(AV_PIX_FMT_P416BE);
+		EVCASE(AV_PIX_FMT_P416LE);
+		EVCASE(AV_PIX_FMT_VUYA);
+		EVCASE(AV_PIX_FMT_RGBAF16BE);
+		EVCASE(AV_PIX_FMT_RGBAF16LE);
+		EVCASE(AV_PIX_FMT_VUYX);
+		EVCASE(AV_PIX_FMT_P012LE);
+		EVCASE(AV_PIX_FMT_P012BE);
+		EVCASE(AV_PIX_FMT_Y212BE);
+		EVCASE(AV_PIX_FMT_Y212LE);
+		EVCASE(AV_PIX_FMT_XV30BE);
+		EVCASE(AV_PIX_FMT_XV30LE);
+		EVCASE(AV_PIX_FMT_XV36BE);
+		EVCASE(AV_PIX_FMT_XV36LE);
+		EVCASE(AV_PIX_FMT_RGBF32BE);
+		EVCASE(AV_PIX_FMT_RGBF32LE);
+		EVCASE(AV_PIX_FMT_RGBAF32BE);
+		EVCASE(AV_PIX_FMT_RGBAF32LE);
+		EVCASE(AV_PIX_FMT_P212BE);
+		EVCASE(AV_PIX_FMT_P212LE);
+		EVCASE(AV_PIX_FMT_P412BE);
+		EVCASE(AV_PIX_FMT_P412LE);
+		EVCASE(AV_PIX_FMT_GBRAP14BE);
+		EVCASE(AV_PIX_FMT_GBRAP14LE);
+		EVCASE(AV_PIX_FMT_D3D12);
+		EVCASE(AV_PIX_FMT_NB);
+		default:
+			return "AV_PIX_FMT_UNKNOWN";
+	}
+}
+#endif
+
 /* Ubuntu 14.04 ships without the functions provided by avutil,
  * so define error to string methods here. */
 #if !defined(av_err2str)
@@ -62,11 +318,26 @@ static inline char* error_string(char* errbuf, size_t errbuf_size, int errnum)
 	return errbuf;
 }
 
-#define av_err2str(errnum) error_string((char[64]){ 0 }, 64, errnum)
+#define av_err2str(errnum) error_string((char[64])WINPR_C_ARRAY_INIT, 64, errnum)
 #endif
 
 #if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING)
-#define VAAPI_DEVICE "/dev/dri/renderD128"
+static const char* get_vaapi_device(void)
+{
+	static char device[MAX_PATH] = WINPR_C_ARRAY_INIT;
+	static bool initialized = false;
+	if (!initialized)
+	{
+		initialized = true;
+		// NOLINTNEXTLINE(concurrency-mt-unsafe)
+		const char* env = getenv("FREERDP_VAAPI_DEVICE");
+		if (env)
+			(void)_snprintf(device, sizeof(device), "%s", env);
+		else
+			(void)_snprintf(device, sizeof(device), "/dev/dri/renderD128");
+	}
+	return device;
+}
 #endif
 
 typedef struct
@@ -81,19 +352,23 @@ typedef struct
 	AVPacket bufferpacket;
 #endif
 	AVPacket* packet;
-#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING)
+#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING) || defined(WITH_VIDEOTOOLBOX)
 	AVBufferRef* hwctx;
+	struct SwsContext* swsctx;
+	int hwFrameSupportsNativeFormat;
 	AVFrame* hwVideoFrame;
+	AVFrame* cpuVideoFrame;
 	enum AVPixelFormat hw_pix_fmt;
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100)
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100) || defined(WITH_VIDEOTOOLBOX)
 	AVBufferRef* hw_frames_ctx;
 #endif
+
 #endif
 } H264_CONTEXT_LIBAVCODEC;
 
 static void libavcodec_destroy_encoder_context(H264_CONTEXT* WINPR_RESTRICT h264)
 {
-	H264_CONTEXT_LIBAVCODEC* sys = NULL;
+	H264_CONTEXT_LIBAVCODEC* sys = nullptr;
 
 	if (!h264 || !h264->subsystem)
 		return;
@@ -110,15 +385,15 @@ static void libavcodec_destroy_encoder_context(H264_CONTEXT* WINPR_RESTRICT h264
 #endif
 	}
 
-	sys->codecEncoderContext = NULL;
+	sys->codecEncoderContext = nullptr;
 }
 
 #ifdef WITH_VAAPI_H264_ENCODING
 static int set_hw_frames_ctx(H264_CONTEXT* WINPR_RESTRICT h264)
 {
 	H264_CONTEXT_LIBAVCODEC* sys = (H264_CONTEXT_LIBAVCODEC*)h264->pSystemData;
-	AVBufferRef* hw_frames_ref = NULL;
-	AVHWFramesContext* frames_ctx = NULL;
+	AVBufferRef* hw_frames_ref = nullptr;
+	AVHWFramesContext* frames_ctx = nullptr;
 	int err = 0;
 
 	if (!(hw_frames_ref = av_hwframe_ctx_alloc(sys->hwctx)))
@@ -153,7 +428,7 @@ static int set_hw_frames_ctx(H264_CONTEXT* WINPR_RESTRICT h264)
 static BOOL libavcodec_create_encoder_context(H264_CONTEXT* WINPR_RESTRICT h264)
 {
 	BOOL recreate = FALSE;
-	H264_CONTEXT_LIBAVCODEC* sys = NULL;
+	H264_CONTEXT_LIBAVCODEC* sys = nullptr;
 
 	if (!h264 || !h264->subsystem)
 		return FALSE;
@@ -232,7 +507,7 @@ static BOOL libavcodec_create_encoder_context(H264_CONTEXT* WINPR_RESTRICT h264)
 		sys->codecEncoderContext->pix_fmt = AV_PIX_FMT_YUV420P;
 	}
 
-	if (avcodec_open2(sys->codecEncoderContext, sys->codecEncoder, NULL) < 0)
+	if (avcodec_open2(sys->codecEncoderContext, sys->codecEncoder, nullptr) < 0)
 		goto EXCEPTION;
 
 	return TRUE;
@@ -240,6 +515,30 @@ EXCEPTION:
 	libavcodec_destroy_encoder_context(h264);
 	return FALSE;
 }
+
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
+static int hw_supports_target_format(AVBufferRef* hwframectx, enum AVPixelFormat target)
+{
+	WINPR_ASSERT(hwframectx);
+
+	enum AVPixelFormat* formats = nullptr;
+	int rc = av_hwframe_transfer_get_formats(hwframectx, AV_HWFRAME_TRANSFER_DIRECTION_FROM,
+	                                         &formats, 0);
+	if (rc == 0)
+	{
+		enum AVPixelFormat* it = formats;
+		while ((rc == 0) && (*it != AV_PIX_FMT_NONE))
+		{
+			enum AVPixelFormat cur = *it++;
+			if (cur == target)
+				rc = 1;
+		}
+	}
+
+	av_free(formats);
+	return rc;
+}
+#endif
 
 static int libavcodec_decompress(H264_CONTEXT* WINPR_RESTRICT h264,
                                  const BYTE* WINPR_RESTRICT pSrcData, UINT32 SrcSize)
@@ -252,7 +551,7 @@ static int libavcodec_decompress(H264_CONTEXT* WINPR_RESTRICT h264,
 	int rc = -1;
 	int status = 0;
 	int gotFrame = 0;
-	AVPacket* packet = NULL;
+	AVPacket* packet = nullptr;
 
 	WINPR_ASSERT(h264);
 	WINPR_ASSERT(pSrcData || (SrcSize == 0));
@@ -293,21 +592,22 @@ static int libavcodec_decompress(H264_CONTEXT* WINPR_RESTRICT h264,
 
 	sys->videoFrame->format = AV_PIX_FMT_YUV420P;
 
-#ifdef WITH_VAAPI
-		status = avcodec_receive_frame(sys->codecDecoderContext,
-		                               sys->hwctx ? sys->hwVideoFrame : sys->videoFrame);
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
+	status = avcodec_receive_frame(sys->codecDecoderContext,
+	                               sys->hwctx ? sys->hwVideoFrame : sys->videoFrame);
 #else
-		status = avcodec_receive_frame(sys->codecDecoderContext, sys->videoFrame);
+	status = avcodec_receive_frame(sys->codecDecoderContext, sys->videoFrame);
 #endif
-	    if (status == AVERROR(EAGAIN))
-	    {
-		    rc = 0;
-		    goto fail;
-	    }
+	if (status == AVERROR(EAGAIN))
+	{
+		rc = 0;
+		goto fail;
+	}
 
-	gotFrame = (status == 0);
+	if (status == 0)
+		gotFrame = 1;
 #else
-#ifdef WITH_VAAPI
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
 	status =
 	    avcodec_decode_video2(sys->codecDecoderContext,
 	                          sys->hwctx ? sys->hwVideoFrame : sys->videoFrame, &gotFrame, packet);
@@ -321,29 +621,72 @@ static int libavcodec_decompress(H264_CONTEXT* WINPR_RESTRICT h264,
 		goto fail;
 	}
 
-#ifdef WITH_VAAPI
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
 
 	if (sys->hwctx)
 	{
-		if (sys->hwVideoFrame->format == sys->hw_pix_fmt)
+		AVFrame* target = sys->videoFrame;
+		if (sys->hwFrameSupportsNativeFormat < 0)
 		{
-			sys->videoFrame->width = sys->hwVideoFrame->width;
-			sys->videoFrame->height = sys->hwVideoFrame->height;
-			status = av_hwframe_transfer_data(sys->videoFrame, sys->hwVideoFrame, 0);
+			const int res = hw_supports_target_format(sys->codecDecoderContext->hw_frames_ctx,
+			                                          sys->videoFrame->format);
+			if (res < 0)
+				status = res;
+			else
+			{
+				sys->hwFrameSupportsNativeFormat = res;
+				const char* msg = "hardware supported copy";
+				if (res == 0)
+					msg = "swscale format conversion";
+				WLog_Print(h264->log, WLOG_DEBUG, "formats: { src:%s, dst:%s } using %s",
+				           av_format_str(sys->hwVideoFrame->format),
+				           av_format_str(sys->videoFrame->format), msg);
+			}
 		}
-		else
+
+		if (sys->hwFrameSupportsNativeFormat == 0)
+			target = sys->cpuVideoFrame;
+
+		if (sys->hwFrameSupportsNativeFormat >= 0)
 		{
-			status = av_frame_copy(sys->videoFrame, sys->hwVideoFrame);
+			if (sys->hwVideoFrame->format == sys->hw_pix_fmt)
+			{
+				target->width = sys->hwVideoFrame->width;
+				target->height = sys->hwVideoFrame->height;
+				status = av_hwframe_transfer_data(target, sys->hwVideoFrame, 0);
+			}
+			else
+				status = av_frame_copy(target, sys->hwVideoFrame);
 		}
-	}
 
-	gotFrame = (status == 0);
+		gotFrame = (status == 0);
 
-	if (status < 0)
-	{
-		WLog_Print(h264->log, WLOG_ERROR, "Failed to transfer video frame (status=%d) (%s)", status,
-		           av_err2str(status));
-		goto fail;
+		if (status < 0)
+		{
+			WLog_Print(h264->log, WLOG_ERROR, "Failed to transfer video frame (status=%d) (%s)",
+			           status, av_err2str(status));
+			goto fail;
+		}
+
+		if (gotFrame && (target != sys->videoFrame))
+		{
+			if (!sys->swsctx)
+			{
+				sys->swsctx = sws_getContext(target->width, target->height, target->format,
+				                             target->width, target->height, sys->videoFrame->format,
+				                             SWS_BILINEAR, nullptr, nullptr, nullptr);
+				if (!sys->swsctx)
+					goto fail;
+			}
+
+			status = sws_scale_frame(sys->swsctx, sys->videoFrame, target);
+			if (status < 0)
+			{
+				WLog_Print(h264->log, WLOG_ERROR, "Failed to convert video frame (status=%d) (%s)",
+				           status, av_err2str(status));
+				goto fail;
+			}
+		}
 	}
 
 #endif
@@ -359,6 +702,8 @@ static int libavcodec_decompress(H264_CONTEXT* WINPR_RESTRICT h264,
 		iStride[1] = (UINT32)MAX(0, sys->videoFrame->linesize[1]);
 		iStride[2] = (UINT32)MAX(0, sys->videoFrame->linesize[2]);
 
+		h264->YUVWidth = WINPR_ASSERTING_INT_CAST(UINT32, sys->videoFrame->width);
+		h264->YUVHeight = WINPR_ASSERTING_INT_CAST(UINT32, sys->videoFrame->height);
 		rc = 1;
 	}
 	else
@@ -411,7 +756,7 @@ static int libavcodec_compress(H264_CONTEXT* WINPR_RESTRICT h264,
 	}
 
 	WINPR_ASSERT(sys->packet);
-	sys->packet->data = NULL;
+	sys->packet->data = nullptr;
 	sys->packet->size = 0;
 
 	WINPR_ASSERT(sys->videoFrame);
@@ -561,7 +906,7 @@ static void libavcodec_uninit(H264_CONTEXT* h264)
 #endif
 	}
 
-#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING)
+#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING) || defined(WITH_VIDEOTOOLBOX)
 	if (sys->hwVideoFrame)
 	{
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(55, 18, 102)
@@ -571,10 +916,20 @@ static void libavcodec_uninit(H264_CONTEXT* h264)
 #endif
 	}
 
+	if (sys->cpuVideoFrame)
+	{
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(55, 18, 102)
+		av_frame_free(&sys->cpuVideoFrame);
+#else
+		av_free(sys->cpuVideoFrame);
+#endif
+	}
+
 	if (sys->hwctx)
 		av_buffer_unref(&sys->hwctx);
+	sws_freeContext(sys->swsctx);
 
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100)
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100) || defined(WITH_VIDEOTOOLBOX)
 
 	if (sys->hw_frames_ctx)
 		av_buffer_unref(&sys->hw_frames_ctx);
@@ -598,10 +953,10 @@ static void libavcodec_uninit(H264_CONTEXT* h264)
 
 	libavcodec_destroy_encoder_context(h264);
 	free(sys);
-	h264->pSystemData = NULL;
+	h264->pSystemData = nullptr;
 }
 
-#ifdef WITH_VAAPI
+#if defined(WITH_VAAPI) || defined(WITH_VIDEOTOOLBOX)
 static enum AVPixelFormat libavcodec_get_format(struct AVCodecContext* ctx,
                                                 const enum AVPixelFormat* fmts)
 {
@@ -617,7 +972,10 @@ static enum AVPixelFormat libavcodec_get_format(struct AVCodecContext* ctx,
 	{
 		if (*p == sys->hw_pix_fmt)
 		{
-#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100)
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 80, 100) || defined(WITH_VIDEOTOOLBOX)
+			if (sys->hw_frames_ctx)
+				av_buffer_unref(&sys->hw_frames_ctx);
+
 			sys->hw_frames_ctx = av_hwframe_ctx_alloc(sys->hwctx);
 
 			if (!sys->hw_frames_ctx)
@@ -630,9 +988,13 @@ static enum AVPixelFormat libavcodec_get_format(struct AVCodecContext* ctx,
 			frames->format = *p;
 			frames->height = sys->codecDecoderContext->coded_height;
 			frames->width = sys->codecDecoderContext->coded_width;
+#ifdef WITH_VIDEOTOOLBOX
+			frames->sw_format = AV_PIX_FMT_YUV420P;
+#else
 			frames->sw_format =
 			    (sys->codecDecoderContext->sw_pix_fmt == AV_PIX_FMT_YUV420P10 ? AV_PIX_FMT_P010
 			                                                                  : AV_PIX_FMT_NV12);
+#endif
 			frames->initial_pool_size = 20;
 
 			if (sys->codecDecoderContext->active_thread_type & FF_THREAD_FRAME)
@@ -659,10 +1021,9 @@ static enum AVPixelFormat libavcodec_get_format(struct AVCodecContext* ctx,
 
 static BOOL libavcodec_init(H264_CONTEXT* h264)
 {
-	H264_CONTEXT_LIBAVCODEC* sys = NULL;
-
 	WINPR_ASSERT(h264);
-	sys = (H264_CONTEXT_LIBAVCODEC*)calloc(1, sizeof(H264_CONTEXT_LIBAVCODEC));
+	H264_CONTEXT_LIBAVCODEC* sys =
+	    (H264_CONTEXT_LIBAVCODEC*)calloc(1, sizeof(H264_CONTEXT_LIBAVCODEC));
 
 	if (!sys)
 	{
@@ -701,18 +1062,18 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 #endif
 
 #ifdef WITH_VAAPI
-
+		sys->hwFrameSupportsNativeFormat = -1;
 		if (!sys->hwctx)
 		{
-			int ret =
-			    av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI, VAAPI_DEVICE, NULL, 0);
+			int ret = av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI,
+			                                 get_vaapi_device(), nullptr, 0);
 
 			if (ret < 0)
 			{
 				WLog_Print(h264->log, WLOG_ERROR,
 				           "Could not initialize hardware decoder, falling back to software: %s",
 				           av_err2str(ret));
-				sys->hwctx = NULL;
+				sys->hwctx = nullptr;
 				goto fail_hwdevice_create;
 			}
 		}
@@ -724,10 +1085,37 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 		sys->codecDecoderContext->hw_device_ctx = av_buffer_ref(sys->hwctx);
 #endif
 		sys->codecDecoderContext->opaque = (void*)h264;
+
 	fail_hwdevice_create:
 #endif
 
-		if (avcodec_open2(sys->codecDecoderContext, sys->codecDecoder, NULL) < 0)
+#ifdef WITH_VIDEOTOOLBOX
+
+		if (!sys->hwctx)
+		{
+			int ret = av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VIDEOTOOLBOX, nullptr,
+			                                 nullptr, 0);
+
+			if (ret < 0)
+			{
+				WLog_Print(
+				    h264->log, WLOG_ERROR,
+				    "Could not initialize VideoToolbox decoder, falling back to software: %s",
+				    av_err2str(ret));
+				sys->hwctx = nullptr;
+				goto fail_vt_create;
+			}
+		}
+		WLog_Print(h264->log, WLOG_INFO, "Using VideoToolbox for accelerated H264 decoding");
+
+		sys->codecDecoderContext->get_format = libavcodec_get_format;
+		sys->hw_pix_fmt = AV_PIX_FMT_VIDEOTOOLBOX;
+		sys->codecDecoderContext->hw_device_ctx = av_buffer_ref(sys->hwctx);
+		sys->codecDecoderContext->opaque = (void*)h264;
+	fail_vt_create:
+#endif
+
+		if (avcodec_open2(sys->codecDecoderContext, sys->codecDecoder, nullptr) < 0)
 		{
 			WLog_Print(h264->log, WLOG_ERROR, "Failed to open libav codec");
 			goto EXCEPTION;
@@ -751,12 +1139,12 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 			{
 				WLog_Print(h264->log, WLOG_ERROR, "H264 VAAPI encoder not found");
 			}
-			else if (av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI, VAAPI_DEVICE, NULL,
-			                                0) < 0)
+			else if (av_hwdevice_ctx_create(&sys->hwctx, AV_HWDEVICE_TYPE_VAAPI, get_vaapi_device(),
+			                                nullptr, 0) < 0)
 			{
 				WLog_Print(h264->log, WLOG_ERROR, "av_hwdevice_ctx_create failed");
-				sys->codecEncoder = NULL;
-				sys->hwctx = NULL;
+				sys->codecEncoder = nullptr;
+				sys->hwctx = nullptr;
 			}
 			else
 			{
@@ -779,8 +1167,9 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 
 #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(55, 18, 102)
 	sys->videoFrame = av_frame_alloc();
-#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING)
+#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING) || defined(WITH_VIDEOTOOLBOX)
 	sys->hwVideoFrame = av_frame_alloc();
+	sys->cpuVideoFrame = av_frame_alloc();
 #endif
 #else
 	sys->videoFrame = avcodec_alloc_frame();
@@ -792,8 +1181,8 @@ static BOOL libavcodec_init(H264_CONTEXT* h264)
 		goto EXCEPTION;
 	}
 
-#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING)
-	if (!sys->hwVideoFrame)
+#if defined(WITH_VAAPI) || defined(WITH_VAAPI_H264_ENCODING) || defined(WITH_VIDEOTOOLBOX)
+	if (!sys->hwVideoFrame || !sys->cpuVideoFrame)
 	{
 		WLog_Print(h264->log, WLOG_ERROR, "Failed to allocate libav hw frame");
 		goto EXCEPTION;

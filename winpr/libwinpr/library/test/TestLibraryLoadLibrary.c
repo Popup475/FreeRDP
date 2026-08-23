@@ -9,13 +9,13 @@
 
 int TestLibraryLoadLibrary(int argc, char* argv[])
 {
-	HINSTANCE library = NULL;
-	LPCSTR SharedLibraryExtension = NULL;
-	CHAR LibraryPath[PATHCCH_MAX_CCH] = { 0 };
-	PCHAR p = NULL;
+	HINSTANCE library = nullptr;
+	LPCSTR SharedLibraryExtension = nullptr;
+	CHAR LibraryPath[PATHCCH_MAX_CCH] = WINPR_C_ARRAY_INIT;
+	PCHAR p = nullptr;
 	WINPR_UNUSED(argc);
 	WINPR_UNUSED(argv);
-	if (!GetModuleFileNameA(NULL, LibraryPath, PATHCCH_MAX_CCH))
+	if (!GetModuleFileNameA(nullptr, LibraryPath, PATHCCH_MAX_CCH))
 	{
 		const UINT32 err = GetLastError();
 		const HRESULT herr = HRESULT_FROM_WIN32(err);
@@ -33,9 +33,11 @@ int TestLibraryLoadLibrary(int argc, char* argv[])
 	}
 	*p = 0;
 
-	NativePathCchAppendA(LibraryPath, PATHCCH_MAX_CCH, "TestLibraryA");
+	if (FAILED(NativePathCchAppendA(LibraryPath, PATHCCH_MAX_CCH, "TestLibraryA")))
+		return -1;
 	SharedLibraryExtension = PathGetSharedLibraryExtensionA(PATH_SHARED_LIB_EXT_WITH_DOT);
-	NativePathCchAddExtensionA(LibraryPath, PATHCCH_MAX_CCH, SharedLibraryExtension);
+	if (FAILED(NativePathCchAddExtensionA(LibraryPath, PATHCCH_MAX_CCH, SharedLibraryExtension)))
+		return -1;
 
 	printf("%s: Loading Library: '%s'\n", __func__, LibraryPath);
 

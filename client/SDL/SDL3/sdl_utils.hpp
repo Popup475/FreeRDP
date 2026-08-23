@@ -86,6 +86,8 @@ namespace sdl::utils
 	[[nodiscard]] std::string toString(SDL_DisplayOrientation orientation);
 	[[nodiscard]] std::string toString(const SDL_DisplayMode* mode);
 	[[nodiscard]] std::string toString(Uint32 type);
+	[[nodiscard]] std::string toString(SDL_Rect rect);
+	[[nodiscard]] std::string toString(SDL_FRect rect);
 
 	[[nodiscard]] UINT32 orientaion_to_rdp(SDL_DisplayOrientation orientation);
 
@@ -172,6 +174,7 @@ namespace sdl::error
 		CONNECT_LOGON_TYPE_NOT_GRANTED = 158,
 		CONNECT_NO_OR_MISSING_CREDENTIALS = 159,
 		CONNECT_TARGET_BOOTING = 160,
+		CONNECT_HYBRID_REQUIRED_BY_SERVER = 161,
 
 		UNKNOWN = 255,
 	};

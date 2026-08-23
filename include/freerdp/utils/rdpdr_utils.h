@@ -60,8 +60,12 @@ extern "C"
 	 *
 	 *  @return The \ref status logged
 	 *  @since version 3.16.0
+	 *  @note Parameter \ref what changed to a format string and variadic arguments were added
+	 * with 3.24.0
 	 */
-	FREERDP_API LONG scard_log_status_error_wlog(wLog* log, const char* what, LONG status);
+	WINPR_ATTR_FORMAT_ARG(2, 4)
+	FREERDP_API LONG scard_log_status_error_wlog(wLog* log, WINPR_FORMAT_ARG const char* what,
+	                                             LONG status, ...);
 	FREERDP_API WINPR_ATTR_NODISCARD const char* scard_get_ioctl_string(UINT32 ioControlCode,
 	                                                                    BOOL funcName);
 
@@ -94,7 +98,7 @@ extern "C"
 	 *  @param ioCode1Mask A \ref RDPDR_CAPS_IRP_MJ value
 	 *  @param buffer A pointer to a buffer that can hold the string representation
 	 *  @param len The length of the buffer in bytes.
-	 *  @return A string representation of the constant mask or \b NULL in case the buffer is too
+	 *  @return A string representation of the constant mask or \b nullptr in case the buffer is too
 	 * small
 	 *
 	 *  @since version 3.21.0

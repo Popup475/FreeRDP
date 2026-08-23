@@ -128,6 +128,10 @@ bool sdl_push_user_event(Uint32 type, ...)
 			event->data1 = va_arg(ap, void*);
 			break;
 		case SDL_EVENT_USER_WINDOW_FULLSCREEN:
+			event->data1 = va_arg(ap, void*);
+			event->code = va_arg(ap, int);
+			event->data2 = reinterpret_cast<void*>(static_cast<uintptr_t>(va_arg(ap, int)));
+			break;
 		case SDL_EVENT_USER_WINDOW_RESIZEABLE:
 			event->data1 = va_arg(ap, void*);
 			event->code = va_arg(ap, int);
@@ -470,6 +474,21 @@ namespace sdl::utils
 
 		return ss.str();
 	}
+
+	std::string toString(SDL_Rect rect)
+	{
+		std::stringstream ss;
+		ss << "SDL_Rect{" << rect.x << "x" << rect.y << "-" << rect.w << "x" << rect.h << "}";
+		return ss.str();
+	}
+
+	std::string toString(SDL_FRect rect)
+	{
+		std::stringstream ss;
+		ss << "SDL_Rect{" << rect.x << "x" << rect.y << "-" << rect.w << "x" << rect.h << "}";
+		return ss.str();
+	}
+
 } // namespace sdl::utils
 
 namespace sdl::error
@@ -516,6 +535,7 @@ namespace sdl::error
 		ENTRY(FREERDP_ERROR_SECURITY_NEGO_CONNECT_FAILED, NEGO_FAILURE),
 		ENTRY(FREERDP_ERROR_CONNECT_LOGON_FAILURE, LOGON_FAILURE),
 		ENTRY(FREERDP_ERROR_CONNECT_TARGET_BOOTING, CONNECT_TARGET_BOOTING),
+		ENTRY(FREERDP_ERROR_CONNECT_HYBRID_REQUIRED_BY_SERVER, CONNECT_HYBRID_REQUIRED_BY_SERVER),
 		ENTRY(FREERDP_ERROR_CONNECT_ACCOUNT_LOCKED_OUT, ACCOUNT_LOCKED_OUT),
 		ENTRY(FREERDP_ERROR_PRE_CONNECT_FAILED, PRE_CONNECT_FAILED),
 		ENTRY(FREERDP_ERROR_CONNECT_UNDEFINED, CONNECT_UNDEFINED),
